@@ -10,7 +10,7 @@ public class TileSpringBoard extends Tile{
     }
 
     public void onCollision(Player p){
-        p.pos.y -= 70;
+        p.pos.y -= 35;
         springUpFrames = 16;
         p.playSound(Platformer.BasePath +"Sound/jump3.wav");
     }

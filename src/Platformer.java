@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.io.Serial;
 import java.util.Timer;
 import java.util.TimerTask;
-
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
 import javax.swing.JFileChooser;
@@ -47,6 +46,7 @@ public class Platformer extends JFrame {
 		int result = fc.showOpenDialog(this);
 		File selectedFile = new File("");
 		addKeyListener(new AL(this));
+		this.setVisible(true);
 		createBufferStrategy(2);
 		bufferStrategy = this.getBufferStrategy();
 
@@ -65,7 +65,7 @@ public class Platformer extends JFrame {
 			l.player = p;
 
 			this.setBounds(0, 0, 1000, 12 * 70);
-			this.setVisible(true);
+			
 			gameStateUpdateTrigger = new Timer();
 			gameStateUpdateTrigger.scheduleAtFixedRate(new TimerTask() {
 
@@ -75,7 +75,7 @@ public class Platformer extends JFrame {
 				}
 
 			}, 0, 10);
-			playSound(BasePath + "Sound/soundtrack.wav");
+			//playSound(BasePath + "Sound/soundtrack.wav");
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -89,6 +89,7 @@ public class Platformer extends JFrame {
 		p.numberOfLifes = 3;
 		l.initLevel();
 		p.points = 0;
+		p.updateBoundingBox();
 	}
 
 	private void updateGameStateAndRepaint() {
@@ -114,29 +115,31 @@ public class Platformer extends JFrame {
 			Tile tile = l.tiles.get(i);
 
 			Vec2 overlapSize = tile.bb.OverlapSize(p.boundingBox);
-
-			float epsilon = 8.f; // experiment with this value. If too low,the player might get stuck when walking over the
-			                     // ground. If too high, it can cause glitching inside/through walls
-
-
-			if (overlapSize.x >= 0 && overlapSize.y >= 0 && Math.abs(overlapSize.x + overlapSize.y) >= epsilon) {
-
-				if(tile.hasRigidCollision) {
-					if (Math.abs(overlapSize.x) > Math.abs(overlapSize.y)) {// Y overlap correction
-
-						if (p.boundingBox.min.y + p.boundingBox.max.y > tile.bb.min.y + tile.bb.max.y) { // player comes from below
+			if (overlapSize.x > 0 && overlapSize.y > 0) {
+				if (tile.hasRigidCollision) {
+					boolean resolveY = overlapSize.y < overlapSize.x; // kleinstes Eindringen zuerst
+					if (resolveY) {
+						float centerP = (p.boundingBox.min.y + p.boundingBox.max.y) * 0.5f;
+						float centerT = (tile.bb.min.y + tile.bb.max.y) * 0.5f;
+						if (centerP > centerT) { // Spieler kommt von unten
 							p.pos.y += overlapSize.y;
+							p.posLastFrame.y = p.pos.y; // Y-Geschwindigkeit nullen
 							p.collidesTop = true;
-						} else { // player comes from above
+						} else { // von oben
 							p.pos.y -= overlapSize.y;
+							p.posLastFrame.y = p.pos.y;
 							p.collidesDown = true;
 						}
-					} else { // X overlap correction
-						if (p.boundingBox.min.x + p.boundingBox.max.x > tile.bb.min.x + tile.bb.max.x) { // player comes from right
+					} else {
+						float centerP = (p.boundingBox.min.x + p.boundingBox.max.x) * 0.5f;
+						float centerT = (tile.bb.min.x + tile.bb.max.x) * 0.5f;
+						if (centerP > centerT) { // von rechts
 							p.pos.x += overlapSize.x;
+							p.posLastFrame.x = p.pos.x; // X-Geschwindigkeit nullen
 							p.collidesLeft = true;
-						} else { // player comes from left
+						} else { // von links
 							p.pos.x -= overlapSize.x;
+							p.posLastFrame.x = p.pos.x;
 							p.collidesRight = true;
 						}
 					}
@@ -176,7 +179,8 @@ public class Platformer extends JFrame {
 		BufferedImage level = (BufferedImage) l.getResultingImage();
 		if (l.offsetX > level.getWidth() - 1000)
 			l.offsetX = level.getWidth() - 1000;
-		BufferedImage bi = level.getSubimage((int) l.offsetX, 0, 1000, level.getHeight());
+			int width = Math.min(1000, level.getWidth() - (int)l.offsetX);
+			BufferedImage bi = level.getSubimage((int) l.offsetX, 0, width, level.getHeight());
 		g2d.drawImage(l.backgroundImage, 0, 0, this);
 		g2d.drawImage(bi, 0, 0, this);
 
@@ -185,9 +189,7 @@ public class Platformer extends JFrame {
 		}
 		g2d.drawImage(getPlayer().getPlayerImage(), (int) (getPlayer().pos.x-l.offsetX), (int) getPlayer().pos.y, this);
 
-		if (getPlayer().numberOfLifes > 0) {
-			g2d.drawImage(getPlayer().tilesLife.get(3 - getPlayer().numberOfLifes), 1000 - 70, 50, this);
-		}
+		
 		g2d.drawString(new String(p.points + ""), 500, 50);
 	}
 
@@ -220,35 +222,21 @@ public class Platformer extends JFrame {
 			int keyCode = event.getKeyCode();
 			Player player = p.getPlayer();
 
-			if (keyCode == KeyEvent.VK_ESCAPE) {
-				dispose();
-			}
+			switch (keyCode) {
+				case KeyEvent.VK_ESCAPE -> p.dispose();
 
-			if (keyCode == KeyEvent.VK_UP) {
-			}
+				case KeyEvent.VK_LEFT -> player.walkingLeft = true;
+				case KeyEvent.VK_RIGHT -> player.walkingRight = true;
 
-			if (keyCode == KeyEvent.VK_DOWN) {
-			}
+				case KeyEvent.VK_SPACE -> player.jump = true;
 
-			if (keyCode == KeyEvent.VK_LEFT) {
-				player.walkingLeft = true;
-			}
-
-			if (keyCode == KeyEvent.VK_RIGHT) {
-				player.walkingRight = true;
-			}
-
-			if (keyCode == KeyEvent.VK_SPACE) {
-				player.jump = true;
-			}
-
-			if (keyCode == KeyEvent.VK_R) {
-				try {
-					restart();
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+				case KeyEvent.VK_R -> {
+					try { p.restart(); } 
+					catch (IOException e) { e.printStackTrace(); }
 				}
+
+				case KeyEvent.VK_F -> player.startPunch();
+				case KeyEvent.VK_E -> player.startSwordAttack();
 			}
 		}
 
@@ -257,35 +245,43 @@ public class Platformer extends JFrame {
 			int keyCode = event.getKeyCode();
 			Player player = p.getPlayer();
 
-			if (keyCode == KeyEvent.VK_UP) {
-			}
+			switch (keyCode) {
+				case KeyEvent.VK_LEFT -> player.walkingLeft = false;
+				case KeyEvent.VK_RIGHT -> player.walkingRight = false;
 
-			if (keyCode == KeyEvent.VK_DOWN) {
-			}
+				case KeyEvent.VK_SPACE -> player.jump = false;
 
-			if (keyCode == KeyEvent.VK_LEFT) {
-				player.walkingLeft = false;
-			}
-
-			if (keyCode == KeyEvent.VK_RIGHT) {
-				player.walkingRight = false;
-			}
-
-			if (keyCode == KeyEvent.VK_SPACE) {
-				player.jump = false;
+				case KeyEvent.VK_F, KeyEvent.VK_E -> {
+					// Attacke losgelassen → zurück zu WALK oder IDLE
+					if (player.walkingLeft || player.walkingRight) {
+						player.currentState = Player.PlayerState.WALK;
+					} else {
+						player.currentState = Player.PlayerState.IDLE;
+					}
+					player.displayedAnimationState = 0; // Animation zurücksetzen
+				}
 			}
 		}
 	}
 
-	public void playSound(String path){
-		File lol = new File(path);
 
-		try{
+
+	boolean soundEnabled = true;
+
+	public void playSound(String path) {
+		if (!soundEnabled) return;  // Sound ausgeschaltet
+
+		try {
+			File soundFile = new File(path);
 			Clip clip = AudioSystem.getClip();
-			clip.open(AudioSystem.getAudioInputStream(lol));
+			clip.open(AudioSystem.getAudioInputStream(soundFile));
 			clip.start();
-		} catch (Exception e){
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	public void setSoundEnabled(boolean enabled) {
+		soundEnabled = enabled;
 	}
 }

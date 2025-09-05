@@ -1,239 +1,224 @@
-import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-
 import javax.imageio.ImageIO;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
 
-public class Player{
-	boolean jump = false, walkingLeft = false, walkingRight = false;
-	boolean collidesTop = false, collidesDown = false, collidesLeft = false, collidesRight = false, collides = false;
+public class Player {
+    enum PlayerState { IDLE, WALK, JUMP, FALL, PUNCH, SWORD_ATTACK }
+    PlayerState currentState = PlayerState.IDLE;
 
-	boolean facingLeft = false;
+    boolean jump = false, walkingLeft = false, walkingRight = false;
+    boolean collidesTop = false, collidesDown = false, collidesLeft = false, collidesRight = false, collides = false;
 
-	Vec2 pos;
-	Vec2 posLastFrame;
-	Vec2 gravity;
-	Vec2 maxSpeed;
+    boolean facingLeft = false;
 
-	public Vec2 lastValidPosition;
+    Vec2 pos;
+    Vec2 posLastFrame;
+    Vec2 gravity;
+    Vec2 maxSpeed;
+    float padX;
+    float padTop;
+    int w;
+    int h;
 
-	float movementSpeed;
+    public Vec2 lastValidPosition;
 
-	BoundingBox boundingBox;
-	int numberAnimationStates = 0;
-	int displayedAnimationState = 0;
-	int numberOfLifes = 3;
-	int moveCounter = 0;
-	int points = 0;
+    float movementSpeed;
 
-	float jumpPower = 35.f;
+    BoundingBox boundingBox;
+    int displayedAnimationState = 0;
+    int moveCounter = 0;
+    int points = 0;
+    int numberOfLifes = 3;
 
-	// Tiles for movement animation
-	protected ArrayList<BufferedImage> tilesWalk;
-	
-	// Tiles for player's life on HUD
-	protected ArrayList<BufferedImage> tilesLife;
-	Level l;
+    float jumpPower = 25.f;
 
-	Player(Level l) {	
-		this.pos = new Vec2(0, 0);
-		this.posLastFrame = new Vec2(0, 0);
-		this.gravity = new Vec2(0, 0.35f);
-		this.maxSpeed = new Vec2(5, 10);
-		this.movementSpeed = 3.5f;
+    private boolean soundEnabled = true;
 
-		this.l = l;
-		tilesWalk = new ArrayList<BufferedImage>();
-		tilesLife = new ArrayList<BufferedImage>();
-		try {
-			// Tiles for player's life on HUD
-			BufferedImage imageFull = ImageIO.read(new File(Platformer.BasePath + "HUD/hud_heartFull.png"));
-			tilesLife.add(imageFull);
-			BufferedImage imageHalf = ImageIO.read(new File(Platformer.BasePath + "HUD/hud_heartHalf.png"));
-			tilesLife.add(imageHalf);
-			BufferedImage imageEmpty = ImageIO.read(new File(Platformer.BasePath + "HUD/hud_heartEmpty.png"));
-			tilesLife.add(imageEmpty);
-			
-			// Tiles for movement animation
-			BufferedImage imageWalk;
-			imageWalk = ImageIO.read(new File(Platformer.BasePath + "Player/p1_walk/PNG/p1_walk01.png"));
-			tilesWalk.add(imageWalk);
-			imageHalf = ImageIO.read(new File(Platformer.BasePath + "Player/p1_walk/PNG/p1_walk02.png"));
-			tilesWalk.add(imageHalf);
-			imageEmpty = ImageIO.read(new File(Platformer.BasePath + "Player/p1_walk/PNG/p1_walk03.png"));
-			tilesWalk.add(imageEmpty);
-			imageWalk = ImageIO.read(new File(Platformer.BasePath + "Player/p1_walk/PNG/p1_walk04.png"));
-			tilesWalk.add(imageWalk);
-			imageHalf = ImageIO.read(new File(Platformer.BasePath + "Player/p1_walk/PNG/p1_walk05.png"));
-			tilesWalk.add(imageHalf);
-			imageEmpty = ImageIO.read(new File(Platformer.BasePath + "Player/p1_walk/PNG/p1_walk06.png"));
-			tilesWalk.add(imageEmpty);
-			imageWalk = ImageIO.read(new File(Platformer.BasePath + "Player/p1_walk/PNG/p1_walk07.png"));
-			tilesWalk.add(imageWalk);
-			imageHalf = ImageIO.read(new File(Platformer.BasePath + "Player/p1_walk/PNG/p1_walk08.png"));
-			tilesWalk.add(imageHalf);
-			imageEmpty = ImageIO.read(new File(Platformer.BasePath + "Player/p1_walk/PNG/p1_walk09.png"));
-			tilesWalk.add(imageEmpty);
-			imageWalk = ImageIO.read(new File(Platformer.BasePath + "Player/p1_walk/PNG/p1_walk10.png"));
-			tilesWalk.add(imageWalk);
-			imageHalf = ImageIO.read(new File(Platformer.BasePath + "Player/p1_walk/PNG/p1_walk11.png"));
-			tilesWalk.add(imageWalk);
-			
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		
-		boundingBox = new BoundingBox(0, 0, tilesWalk.get(0).getWidth(), tilesWalk.get(0).getHeight());
-		numberAnimationStates = tilesWalk.size();
+    // Animation-Listen
+    private ArrayList<BufferedImage> idleTiles = new ArrayList<>();
+    private ArrayList<BufferedImage> walkTiles = new ArrayList<>();
+    private ArrayList<BufferedImage> jumpTiles = new ArrayList<>();
+    private ArrayList<BufferedImage> fallTiles = new ArrayList<>();
+    private ArrayList<BufferedImage> punchTiles = new ArrayList<>();
+    private ArrayList<BufferedImage> swordAttackTiles = new ArrayList<>();
 
-	}
+    Level l;
 
-	private void move(int deltaX) {
-		if (deltaX < 0) {
-				pos.x = pos.x - movementSpeed / 4;
-		} else if (deltaX > 0) {
-				pos.x = pos.x + movementSpeed / 4;
-		}
-	}
+    Player(Level l) {
+        this.pos = new Vec2(0, 0);
+        this.posLastFrame = new Vec2(0, 0);
+        this.gravity = new Vec2(0, 0.35f);
+        this.maxSpeed = new Vec2(5, 10);
+        this.movementSpeed = 3.5f;
+        this.l = l;
 
-	public void kill() {
-		if (numberOfLifes > 0) {
-			numberOfLifes--;
-			pos.x = lastValidPosition.x;
-			pos.y = lastValidPosition.y;
-			posLastFrame.x = pos.x;
-			posLastFrame.y = pos.y;
-		}
+        try {
+            idleTiles.add(ImageIO.read(new File(Platformer.BasePath + "Steve/Idle.png")));
+            for (int i = 1; i <= 4; i++) walkTiles.add(ImageIO.read(new File(Platformer.BasePath + "Steve/Walk" + i + ".png")));
+            jumpTiles.add(ImageIO.read(new File(Platformer.BasePath + "Steve/Jump.png")));
+            fallTiles.add(ImageIO.read(new File(Platformer.BasePath + "Steve/Fall.png")));
+            for (int i = 1; i <= 6; i++) punchTiles.add(ImageIO.read(new File(Platformer.BasePath + "Steve/Punch" + i + ".png")));
+            for (int i = 1; i <= 8; i++) swordAttackTiles.add(ImageIO.read(new File(Platformer.BasePath + "Steve/SwordAttack" + i + ".png")));
+            swordAttackTiles.add(ImageIO.read(new File(Platformer.BasePath + "Steve/SwordAttackUp.png")));
+            swordAttackTiles.add(ImageIO.read(new File(Platformer.BasePath + "Steve/SwordAttackDown.png")));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
-	}
+        int targetH = (int) (Tile.tileSize * 2.1f);
+        scaleAllAnimations(targetH);
 
-	public void update() {
-		
-		// Check if walking and call move()
-		if (walkingLeft){
-			move(-1);
-			facingLeft = true;
-		}
-		if (walkingRight){
-			move(1);
-			facingLeft = false;
-		}
+        this.w = idleTiles.get(0).getWidth();
+        this.h = idleTiles.get(0).getHeight();
+        this.padX = w * 0.12f;
+        this.padTop = h * 0.05f;
 
-		if(jump && collidesDown){
-			pos.y -= jumpPower;
-			playSound(Platformer.BasePath + "Sound/jump2.wav");
-		}
+        boundingBox = new BoundingBox(padX, 0, w - padX, h);
+    }
 
-		// Save old position
-		Vec2 pos_lastFrame_temp = pos;
+    private void scaleAllAnimations(int targetH) {
+        for (int i = 0; i < idleTiles.size(); i++) idleTiles.set(i, scaleToHeight(idleTiles.get(i), targetH));
+        for (int i = 0; i < walkTiles.size(); i++) walkTiles.set(i, scaleToHeight(walkTiles.get(i), targetH));
+        for (int i = 0; i < jumpTiles.size(); i++) jumpTiles.set(i, scaleToHeight(jumpTiles.get(i), targetH));
+        for (int i = 0; i < fallTiles.size(); i++) fallTiles.set(i, scaleToHeight(fallTiles.get(i), targetH));
+        for (int i = 0; i < punchTiles.size(); i++) punchTiles.set(i, scaleToHeight(punchTiles.get(i), targetH));
+        for (int i = 0; i < swordAttackTiles.size(); i++) swordAttackTiles.set(i, scaleToHeight(swordAttackTiles.get(i), targetH));
+    }
 
-		// Add gravity and move according to the actual speed
-		pos = pos.add(pos.sub(posLastFrame));
+    private static BufferedImage scaleToHeight(BufferedImage src, int targetH) {
+        double s = targetH / (double) src.getHeight();
+        int w = (int) Math.round(src.getWidth() * s);
+        BufferedImage dst = new BufferedImage(w, targetH, BufferedImage.TYPE_INT_ARGB);
+        AffineTransform at = AffineTransform.getScaleInstance(s, s);
+        AffineTransformOp op = new AffineTransformOp(at, AffineTransformOp.TYPE_BILINEAR);
+        op.filter(src, dst);
+        return dst;
+    }
 
-		// Get saved old Position back
-		posLastFrame = pos_lastFrame_temp;
+    public void kill() {
+        if (numberOfLifes > 0) {
+            numberOfLifes--;
+            pos.x = lastValidPosition.x;
+            pos.y = lastValidPosition.y;
+            posLastFrame.x = pos.x;
+            posLastFrame.y = pos.y;
+        }
+    }
 
-		//apply gravity
-		pos = pos.add(gravity);
+    public void update() {
+        Vec2 vel = pos.sub(posLastFrame);
 
-		// Calculate difference in X
-		float diffX = pos.x - posLastFrame.x;
-		
-		// Factor to damp the energy, otherwise the player would glitch threw the world
-		float damping = 0.02f;
-		if(collides){
-			damping = 0.2f;
-		}
+        if (walkingLeft) {
+            vel.x -= movementSpeed / 5f;
+            facingLeft = true;
+        } else if (walkingRight) {
+            vel.x += movementSpeed / 5f;
+            facingLeft = false;
+        } else if (collidesDown) {
+            vel.x *= 0.5f;
+            if (Math.abs(vel.x) < 0.1f) vel.x = 0;
+        }
 
-		// Generate a damped version of the difference
-		pos.x = posLastFrame.x + diffX * (1.0f-damping);
+        if (jump && collidesDown) {
+            vel.y = -jumpPower;
+            collidesDown = false;
+        }
 
-		// Check weather speed is under maxSpeed 
-		if (pos.x - posLastFrame.x > maxSpeed.x)
-			pos.x = posLastFrame.x + maxSpeed.x;
+        if (collidesDown) vel = vel.mul(0.92f);
+        else { vel.x *= 0.85f; vel.y *= 0.92f; }
 
-		if (pos.x - posLastFrame.x < -maxSpeed.x)
-			pos.x = posLastFrame.x - maxSpeed.x;
+        posLastFrame = new Vec2(pos.x, pos.y);
+        pos = pos.add(vel).add(gravity);
 
-		if (pos.y - posLastFrame.y > maxSpeed.y)
-			pos.y = posLastFrame.y + maxSpeed.y;
+        if (pos.x < 0) pos.x = 0;
+        if (pos.x > l.lvlSize.x - w) pos.x = l.lvlSize.x - w;
+        if (pos.y > l.lvlSize.y - h) pos.y = l.lvlSize.y - h;
 
-		if (pos.y - posLastFrame.y < -maxSpeed.y)
-			pos.y = posLastFrame.y - maxSpeed.y;
+        updateBoundingBox();
 
-		// Check window boundaries
-		if (pos.x < 0)
-			pos.x = 0;
+        // State setzen, nur wenn keine Attacke läuft
+        if (currentState != PlayerState.PUNCH && currentState != PlayerState.SWORD_ATTACK) {
+            if (vel.y > 1.0f && !collidesDown) currentState = PlayerState.FALL;
+            else if (walkingLeft || walkingRight) currentState = PlayerState.WALK;
+            else if (!jump) currentState = PlayerState.IDLE;
+        }
 
-		if (pos.x > l.lvlSize.x-Tile.tileSize)
-			pos.x = l.lvlSize.x-Tile.tileSize;
+        // Attacke nach der Animation zurücksetzen
+        if ((currentState == PlayerState.PUNCH || currentState == PlayerState.SWORD_ATTACK)
+                && displayedAnimationState >= getCurrentAnimationFrames().size() - 1) {
+            displayedAnimationState = 0;
+            currentState = PlayerState.IDLE;
+        }
+    }
 
-		updateBoundingBox();
-	}
+    public void updateBoundingBox() {
+        boundingBox.min.x = pos.x + padX;
+        boundingBox.min.y = pos.y + padTop;
+        boundingBox.max.x = pos.x + w - padX;
+        boundingBox.max.y = pos.y + h;
+    }
 
-	public void updateBoundingBox(){
-		// update BoundingBox
-		boundingBox.min.x = pos.x;
-		boundingBox.min.y = pos.y;
+    public BufferedImage getPlayerImage() {
+        BufferedImage frame = getNextFrame();
+        if (facingLeft) {
+            BufferedImage flipped = new BufferedImage(frame.getWidth(), frame.getHeight(), frame.getType());
+            Graphics2D g = flipped.createGraphics();
+            g.drawImage(frame, frame.getWidth(), 0, -frame.getWidth(), frame.getHeight(), null);
+            g.dispose();
+            return flipped;
+        }
+        return frame;
+    }
 
-		boundingBox.max.x = pos.x + tilesWalk.get(0).getWidth();
-		boundingBox.max.y = pos.y + tilesWalk.get(0).getHeight();
-	}
+    private BufferedImage getNextFrame() {
+        ArrayList<BufferedImage> anim = getCurrentAnimationFrames();
 
-	public BufferedImage getPlayerImage() {
-		BufferedImage b = getNextTile();
-		if (facingLeft) {
-			AffineTransform tx = AffineTransform.getScaleInstance(-1, 1);
-			tx.translate(-b.getWidth(null), 0);
-			AffineTransformOp op = new AffineTransformOp(tx, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
-			b = op.filter(b, null);
-		}
-		return b;
-	}
+        // Bewegungsgesteuerte Animationsgeschwindigkeit
+        if (currentState == PlayerState.IDLE) {
+            moveCounter++;
+            if (moveCounter >= 10) { displayedAnimationState++; moveCounter = 0; }
+        } else {
+            moveCounter++;
+            if (moveCounter >= 5) { displayedAnimationState++; moveCounter = 0; }
+        }
 
-	private BufferedImage getNextTile() {
-		if ((walkingLeft || walkingRight)) {
-			moveCounter++;
-			if(moveCounter>=3) {
-				displayedAnimationState++;
-				moveCounter = 0;
-			}
-			if (displayedAnimationState > numberAnimationStates - 1) {
-				displayedAnimationState = 0;
-			}
-			return tilesWalk.get(displayedAnimationState);
-		}
-		return tilesWalk.get(7);
-	}
-	
-	//public void playSound(String path) {
-	//    try {
-    //        new javafx.embed.swing.JFXPanel();
-    //        String uriString = new File(path).toURI().toString();
-    //        javafx.scene.media.Media m = new javafx.scene.media.Media(uriString);
-    //        MediaPlayer mp = new MediaPlayer(m);
-    //        mp.play();
-	//    } catch(Exception ex) {
-	//        ex.printStackTrace();
-	//    }
-	//}
+        if (displayedAnimationState >= anim.size()) displayedAnimationState = 0;
+        return anim.get(displayedAnimationState);
+    }
 
-	public void playSound(String path){
-		File lol = new File(path);
+    private ArrayList<BufferedImage> getCurrentAnimationFrames() {
+        return switch (currentState) {
+            case WALK -> walkTiles;
+            case JUMP -> jumpTiles;
+            case FALL -> fallTiles;
+            case PUNCH -> punchTiles;
+            case SWORD_ATTACK -> swordAttackTiles;
+            default -> idleTiles;
+        };
+    }
 
-		try{
-			Clip clip = AudioSystem.getClip();
-			clip.open(AudioSystem.getAudioInputStream(lol));
-			clip.start();
-		} catch (Exception e){
-			e.printStackTrace();
-		}
-	}
+    public void startPunch() { currentState = PlayerState.PUNCH; displayedAnimationState = 0; }
+    public void startSwordAttack() { currentState = PlayerState.SWORD_ATTACK; displayedAnimationState = 0; }
 
+    public void playSound(String path) {
+        if (!soundEnabled) return;
+
+        try {
+            File soundFile = new File(path);
+            Clip clip = AudioSystem.getClip();
+            clip.open(AudioSystem.getAudioInputStream(soundFile));
+            clip.start();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void setSoundEnabled(boolean enabled) { soundEnabled = enabled; }
 }
