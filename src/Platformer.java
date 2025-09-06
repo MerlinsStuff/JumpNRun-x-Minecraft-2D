@@ -1,5 +1,6 @@
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.RenderingHints.Key;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
@@ -90,6 +91,7 @@ public class Platformer extends JFrame {
 		l.initLevel();
 		p.points = 0;
 		p.updateBoundingBox();
+		
 	}
 
 	private void updateGameStateAndRepaint() {
@@ -237,6 +239,7 @@ public class Platformer extends JFrame {
 
 				case KeyEvent.VK_F -> player.startPunch();
 				case KeyEvent.VK_E -> player.startSwordAttack();
+				case KeyEvent.VK_P -> player.changeSoundEnabled();
 			}
 		}
 
@@ -265,8 +268,8 @@ public class Platformer extends JFrame {
 	}
 
 
-
-	boolean soundEnabled = true;
+/* 
+	boolean soundEnabled = false;
 
 	public void playSound(String path) {
 		if (!soundEnabled) return;  // Sound ausgeschaltet
@@ -284,4 +287,5 @@ public class Platformer extends JFrame {
 	public void setSoundEnabled(boolean enabled) {
 		soundEnabled = enabled;
 	}
+		*/
 }

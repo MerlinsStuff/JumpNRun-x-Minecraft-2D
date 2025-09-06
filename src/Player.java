@@ -81,6 +81,20 @@ public class Player {
         this.padTop = h * 0.05f;
 
         boundingBox = new BoundingBox(padX, 0, w - padX, h);
+        updateBoundingBox();
+        posLastFrame.x = pos.x;
+        posLastFrame.y = pos.y;
+
+        for(Tile t: l.tiles){
+            if(!t.hasRigidCollision) continue;
+            BoundingBox below = new BoundingBox(boundingBox.min.x, boundingBox.max.y + 1,
+                                                boundingBox.max.x, boundingBox.max.y + 2);
+            if (t.bb.intersect(below)) {
+                collidesDown = true;
+                lastValidPosition = new Vec2(pos.x, pos.y);
+                break;
+            }
+        }
     }
 
     private void scaleAllAnimations(int targetH) {
@@ -162,7 +176,7 @@ public class Player {
         boundingBox.min.x = pos.x + padX;
         boundingBox.min.y = pos.y + padTop;
         boundingBox.max.x = pos.x + w - padX;
-        boundingBox.max.y = pos.y + h;
+        boundingBox.max.y = pos.y + h - padTop;
     }
 
     public BufferedImage getPlayerImage() {
@@ -204,8 +218,33 @@ public class Player {
         };
     }
 
-    public void startPunch() { currentState = PlayerState.PUNCH; displayedAnimationState = 0; }
-    public void startSwordAttack() { currentState = PlayerState.SWORD_ATTACK; displayedAnimationState = 0; }
+    public void startPunch() { 
+        currentState = PlayerState.PUNCH; 
+        displayedAnimationState = 0; 
+        attackTiles(1);
+    }
+    public void startSwordAttack() { 
+        currentState = PlayerState.SWORD_ATTACK; 
+        displayedAnimationState = 0; 
+        attackTiles(2);
+    }
+
+    private void attackTiles(int strength) {
+        float attackWidth = Tile.tileSize * 0.6f;
+        float attackHeight = h * 0.8f;
+
+        float ax = facingLeft ? pos.x - attackWidth : pos.x + w;
+        float ay = pos.y + h * 0.1f;
+
+        BoundingBox attackBox = new BoundingBox(ax, ay, ax + attackWidth, ay + attackHeight);
+
+        for (Tile tile : new ArrayList<>(l.tiles)) { // Kopie, da Tiles gelöscht werden könnten
+            if (tile instanceof TileBreakable && tile.bb.intersect(attackBox)) {
+                ((TileBreakable) tile).damage(l, strength);
+                break; // nur 1 Tile pro Schlag
+            }
+        }
+    }
 
     public void playSound(String path) {
         if (!soundEnabled) return;
@@ -218,7 +257,12 @@ public class Player {
         } catch (Exception e) {
             e.printStackTrace();
         }
+
     }
 
-    public void setSoundEnabled(boolean enabled) { soundEnabled = enabled; }
+    public void changeSoundEnabled(){
+        this.soundEnabled = !this.soundEnabled;
+    }
+
+
 }
