@@ -87,14 +87,21 @@ public class Platformer extends JFrame {
 	private void restart() throws IOException {
 		p.pos.x = 0;
 		p.pos.y = 0;
-		l.offsetX = 0;
+		p.posLastFrame.x = 0;
+		p.posLastFrame.y = 0;
+		p.lastValidPosition.x = 0;
+		p.lastValidPosition.y = 0;
 		p.numberOfLifes = 3;
+		p.points = 0;
+		p.currentState = Player.PlayerState.IDLE;
+		p.displayedAnimationState = 0;
+		p.updateBoundingBox();
+
+		l.offsetX = 0;
 		l.creepers.clear();
 		l.initLevel();
-		p.points = 0;
-		p.updateBoundingBox();
-		
-	}
+			
+		}
 
 	private void updateGameStateAndRepaint() {
 		l.update();
@@ -157,11 +164,6 @@ public class Platformer extends JFrame {
 		for (Creeper c : new ArrayList<>(l.creepers)) {
 			Vec2 overlap = c.bb.OverlapSize(p.boundingBox);
 			if (overlap.x > 0 && overlap.y > 0) {
-				// Creeper exploding damages player
-				if (c.currentState == Creeper.State.EXPLODE) {
-					p.kill();
-				}
-
 				// Player attacking creeper
 				BoundingBox attackBox = p.getAttackBox(); // let player define attack box
 				int damage = p.getAttackDamage();

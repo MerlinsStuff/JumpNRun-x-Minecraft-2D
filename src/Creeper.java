@@ -19,7 +19,7 @@ public class Creeper {
 
     int w, h;
     float movementSpeed = 2.0f;
-    float roamRange = 100f; // How far he roams from spawn
+    float roamRange = 200f; // How far he roams from spawn
     Vec2 spawnPos;
 
     int displayedAnimationState = 0;
@@ -59,83 +59,117 @@ public class Creeper {
     }
 
     public void update(Player p) {
-        Vec2 vel = pos.sub(posLastFrame);
+        // --- AI / velocity calculation ---
+        float vx = 0; // horizontal velocity
+        float vy = pos.y - posLastFrame.y; // vertical velocity from last frame
 
         // Distance to player
         float dx = (p.pos.x + p.w/2) - (pos.x + w/2);
         float dy = (p.pos.y + p.h/2) - (pos.y + h/2);
         float dist = (float)Math.sqrt(dx*dx + dy*dy);
 
-        boolean seesPlayer = dist < 400; // can “see” player
+        boolean seesPlayer = dist < 400; 
         boolean inExplodeRange = dist < explodeRange;
 
-        // State machine
+        // --- State machine ---
         switch(currentState) {
-            case IDLE -> {
-                if(seesPlayer) {
-                    currentState = State.WALK;
-                }
-            }
+            case IDLE -> { if(seesPlayer) currentState = State.WALK; }
             case WALK -> {
-                // roam randomly around spawn
                 if(!seesPlayer) {
-                    float dir = rand.nextFloat()*2 -1; // -1..1
-                    vel.x = dir * movementSpeed;
-                    facingLeft = vel.x<0;
+                    float dir = rand.nextFloat()*2 - 1; // -1..1
+                    vx = dir * movementSpeed;
+                    facingLeft = vx < 0;
                     // clamp to spawn range
-                    if(pos.x < spawnPos.x - roamRange) vel.x = Math.abs(vel.x);
-                    if(pos.x > spawnPos.x + roamRange) vel.x = -Math.abs(vel.x);
-                } else {
-                    currentState = State.CHASE;
-                }
+                    if(pos.x < spawnPos.x - roamRange) vx = Math.abs(vx);
+                    if(pos.x > spawnPos.x + roamRange) vx = -Math.abs(vx);
+                } else { currentState = State.CHASE; }
             }
             case CHASE -> {
-                // move towards player
-                if(dx<0) { vel.x = -movementSpeed; facingLeft = true; }
-                else { vel.x = movementSpeed; facingLeft = false; }
-
+                vx = (dx < 0) ? -movementSpeed : movementSpeed;
+                facingLeft = vx < 0;
                 if(!seesPlayer) currentState = State.WALK;
-
-                if(inExplodeRange && explodeTimer<0) {
-                    explodeTimer = explodeDelay;
-                }
+                if(inExplodeRange && explodeTimer < 0) explodeTimer = explodeDelay;
             }
             case HURT -> {
-                // simple knockback
-                vel.x *= 0.5f;
+                vx *= 0.5f;
                 if(displayedAnimationState >= hurtTiles.size()-1) {
                     currentState = State.WALK;
                     displayedAnimationState = 0;
                 }
             }
             case EXPLODE -> {
-                // countdown animation
-                vel.x = 0;
+                vx = 0;
                 if(displayedAnimationState >= explodeTiles.size()-1) {
-                    explode(); // do damage and remove creeper
+                    explode();
                     return;
                 }
             }
         }
 
-        posLastFrame = new Vec2(pos.x,pos.y);
-        pos = pos.add(vel);
-
-        updateBoundingBox();
-
-        if(explodeTimer>=0) {
-            explodeTimer--;
-            if(explodeTimer==0) currentState = State.EXPLODE;
+        // --- Explode timer ---
+        if(explodeTimer >= 0) {
+            if(!inExplodeRange) {
+                explodeTimer = -1;
+                currentState = State.CHASE;
+            } else {
+                explodeTimer--;
+                if(explodeTimer == 0) currentState = State.EXPLODE;
+            }
         }
 
-        // Animation counter
+        // --- Gravity ---
+        vy += 0.5f;
+        if(vy > 8) vy = 8;
+
+        // --- Apply velocity ---
+        posLastFrame = new Vec2(pos.x, pos.y);
+        pos.x += vx;
+        pos.y += vy;
+        updateBoundingBox();
+
+        // --- Collision with tiles (player-style overlap) ---
+        for (Tile tile : new ArrayList<>(l.tiles)) {
+            Vec2 overlap = tile.bb.OverlapSize(bb);
+            if (overlap.x > 0 && overlap.y > 0) {
+                if (tile.hasRigidCollision) {
+                    boolean resolveY = overlap.y < overlap.x; // smallest penetration first
+                    if (resolveY) {
+                        float centerC = (bb.min.y + bb.max.y) * 0.5f;
+                        float centerT = (tile.bb.min.y + tile.bb.max.y) * 0.5f;
+                        if (centerC > centerT) { // from below
+                            pos.y += overlap.y;
+                            posLastFrame.y = pos.y;
+                        } else { // from above
+                            pos.y -= overlap.y;
+                            posLastFrame.y = pos.y;
+                            vy = 0; // landed
+                        }
+                    } else {
+                        float centerC = (bb.min.x + bb.max.x) * 0.5f;
+                        float centerT = (tile.bb.min.x + tile.bb.max.x) * 0.5f;
+                        if (centerC > centerT) { // from right
+                            pos.x += overlap.x;
+                            posLastFrame.x = pos.x;
+                        } else { // from left
+                            pos.x -= overlap.x;
+                            posLastFrame.x = pos.x;
+                        }
+                    }
+                }
+                //tile.onCollision(this); // optional if creeper triggers tile effects
+                updateBoundingBox();
+            }
+        }
+
+        // --- Animation ---
         moveCounter++;
         int frameDelay = (currentState==State.IDLE) ? 20 : 5;
-        if(moveCounter>=frameDelay) { displayedAnimationState++; moveCounter=0; }
-
+        if(moveCounter >= frameDelay) { displayedAnimationState++; moveCounter = 0; }
         ArrayList<BufferedImage> frames = getCurrentAnimationFrames();
-        if(displayedAnimationState>=frames.size()) displayedAnimationState=0;
+        if(displayedAnimationState >= frames.size()) displayedAnimationState = 0;
     }
+
+
 
     public void updateBoundingBox() {
         bb.min.x = pos.x;
