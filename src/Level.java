@@ -1,14 +1,11 @@
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Image;
-import java.awt.geom.AffineTransform;
-import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
-
 import javax.imageio.ImageIO;
 
 public class Level {
@@ -17,13 +14,15 @@ public class Level {
 	Vec2 lvlSize;
 	float offsetX;
 	ArrayList<Tile> tiles;
+	public ArrayList<Creeper> creepers;
 
 	public Level(String levelMapPath, String levelBackgroundMapPath) {
 		try {
 			backgroundImage = ImageIO.read(new File(levelBackgroundMapPath));
-			tiles = new ArrayList<Tile>();
+			tiles = new ArrayList<>();
 			lvlSize = new Vec2(0, 0);
 			offsetX = 0.0f;
+			creepers = new ArrayList<Creeper>();
 
 			try {
 				// Level image
@@ -142,6 +141,12 @@ public class Level {
 				return new TileBreakable("./assets/Tiles/grassCenter/", "GrassCenter", x, y);
 			case 0xFFFFAFAF: // Pink - Grass
 				return new TileBreakable("./assets/Tiles/grass/", "Grass", x, y);
+			case 0xFF006400:
+				Creeper c = new Creeper(this, x - Tile.tileSize, y - Tile.tileSize);
+				System.out.println("Creeper spawned at " + c.pos.x + ", " + c.pos.y);
+				creepers.add(c);
+
+				return null;
 			default:
 				return null;
 		}

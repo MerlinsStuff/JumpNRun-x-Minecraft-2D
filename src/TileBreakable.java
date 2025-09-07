@@ -7,9 +7,9 @@ import javax.imageio.ImageIO;
 
 public class TileBreakable extends Tile {
 
-    private ArrayList<BufferedImage> breakStages = new ArrayList<>();
-    private int currentStage = 0;
-    private boolean destroyed = false;
+    ArrayList<BufferedImage> breakStages = new ArrayList<>();
+    int currentStage = 0;
+    boolean destroyed = false;
 
     public TileBreakable(String basePath, String tileName, float x, float y) {
         super(0, x, y); // imageIndex nicht relevant

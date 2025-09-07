@@ -1,6 +1,5 @@
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.RenderingHints.Key;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
@@ -10,10 +9,9 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serial;
+import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
-import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.Clip;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.filechooser.FileFilter;
@@ -51,6 +49,9 @@ public class Platformer extends JFrame {
 		createBufferStrategy(2);
 		bufferStrategy = this.getBufferStrategy();
 
+		if (result == JFileChooser.APPROVE_OPTION) {
+			selectedFile = fc.getSelectedFile();
+		} else { dispose(); System.exit(0); }
 
 		if (result == JFileChooser.APPROVE_OPTION) {
 			selectedFile = fc.getSelectedFile();
@@ -88,6 +89,7 @@ public class Platformer extends JFrame {
 		p.pos.y = 0;
 		l.offsetX = 0;
 		p.numberOfLifes = 3;
+		l.creepers.clear();
 		l.initLevel();
 		p.points = 0;
 		p.updateBoundingBox();
@@ -97,37 +99,33 @@ public class Platformer extends JFrame {
 	private void updateGameStateAndRepaint() {
 		l.update();
 		p.update();
+		for(Creeper c : new ArrayList<>(l.creepers)) c.update(p);
 		checkCollision();
-
 		repaint();
 	}
 
 	private void checkCollision() {
-		float playerPosX = p.pos.x;
-
+		// Reset player collision flags
 		p.collidesDown = false;
 		p.collidesLeft = false;
 		p.collidesRight = false;
 		p.collidesTop = false;
 		p.collides = false;
 
-		// Collision
-		for (int i = 0; i < l.tiles.size(); i++) {
-
-			Tile tile = l.tiles.get(i);
-
+		// ===== Tile Collisions =====
+		for (Tile tile : new ArrayList<>(l.tiles)) {
 			Vec2 overlapSize = tile.bb.OverlapSize(p.boundingBox);
 			if (overlapSize.x > 0 && overlapSize.y > 0) {
 				if (tile.hasRigidCollision) {
-					boolean resolveY = overlapSize.y < overlapSize.x; // kleinstes Eindringen zuerst
+					boolean resolveY = overlapSize.y < overlapSize.x; // resolve smallest penetration first
 					if (resolveY) {
 						float centerP = (p.boundingBox.min.y + p.boundingBox.max.y) * 0.5f;
 						float centerT = (tile.bb.min.y + tile.bb.max.y) * 0.5f;
-						if (centerP > centerT) { // Spieler kommt von unten
+						if (centerP > centerT) { // from below
 							p.pos.y += overlapSize.y;
-							p.posLastFrame.y = p.pos.y; // Y-Geschwindigkeit nullen
+							p.posLastFrame.y = p.pos.y;
 							p.collidesTop = true;
-						} else { // von oben
+						} else { // from above
 							p.pos.y -= overlapSize.y;
 							p.posLastFrame.y = p.pos.y;
 							p.collidesDown = true;
@@ -135,11 +133,11 @@ public class Platformer extends JFrame {
 					} else {
 						float centerP = (p.boundingBox.min.x + p.boundingBox.max.x) * 0.5f;
 						float centerT = (tile.bb.min.x + tile.bb.max.x) * 0.5f;
-						if (centerP > centerT) { // von rechts
+						if (centerP > centerT) { // from right
 							p.pos.x += overlapSize.x;
-							p.posLastFrame.x = p.pos.x; // X-Geschwindigkeit nullen
+							p.posLastFrame.x = p.pos.x;
 							p.collidesLeft = true;
-						} else { // von links
+						} else { // from left
 							p.pos.x -= overlapSize.x;
 							p.posLastFrame.x = p.pos.x;
 							p.collidesRight = true;
@@ -149,19 +147,38 @@ public class Platformer extends JFrame {
 				p.collides = true;
 				tile.onCollision(p);
 				p.updateBoundingBox();
-				if (p.numberOfLifes == 0)
-					try {
-						gameOver();
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
+				if (p.numberOfLifes == 0) {
+					try { gameOver(); } catch (IOException e) { e.printStackTrace(); }
+				}
+			}
+		}
+
+		// ===== Creeper Collisions =====
+		for (Creeper c : new ArrayList<>(l.creepers)) {
+			Vec2 overlap = c.bb.OverlapSize(p.boundingBox);
+			if (overlap.x > 0 && overlap.y > 0) {
+				// Creeper exploding damages player
+				if (c.currentState == Creeper.State.EXPLODE) {
+					p.kill();
+				}
+
+				// Player attacking creeper
+				BoundingBox attackBox = p.getAttackBox(); // let player define attack box
+				int damage = p.getAttackDamage();
+
+				if (attackBox != null && c.bb.intersect(attackBox)) {
+					boolean fromLeft = p.pos.x < c.pos.x;
+					c.hurt(p, damage, fromLeft);
+				}
 			}
 		}
 	}
 
+
 	private void gameOver() throws IOException {
 		restart();
 	}
+
 
 	@Override
 	public void paint(Graphics g) {
@@ -178,6 +195,7 @@ public class Platformer extends JFrame {
 	}
 
 	private void draw(Graphics2D g2d) {
+		if (l == null || l.getResultingImage() == null) return;
 		BufferedImage level = (BufferedImage) l.getResultingImage();
 		if (l.offsetX > level.getWidth() - 1000)
 			l.offsetX = level.getWidth() - 1000;
@@ -189,6 +207,7 @@ public class Platformer extends JFrame {
 		for (int i = 0; i< l.tiles.size(); i++) {
 			l.tiles.get(i).draw(g2d,l.offsetX,0);
 		}
+		for(Creeper c : l.creepers) c.draw(g2d, l.offsetX, 0);
 		g2d.drawImage(getPlayer().getPlayerImage(), (int) (getPlayer().pos.x-l.offsetX), (int) getPlayer().pos.y, this);
 
 		

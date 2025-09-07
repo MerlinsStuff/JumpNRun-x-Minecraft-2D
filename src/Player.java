@@ -221,15 +221,15 @@ public class Player {
     public void startPunch() { 
         currentState = PlayerState.PUNCH; 
         displayedAnimationState = 0; 
-        attackTiles(1);
+        attack(1);
     }
     public void startSwordAttack() { 
         currentState = PlayerState.SWORD_ATTACK; 
         displayedAnimationState = 0; 
-        attackTiles(2);
+        attack(2);
     }
 
-    private void attackTiles(int strength) {
+    private void attack(int strength) {
         float attackWidth = Tile.tileSize * 0.6f;
         float attackHeight = h * 0.8f;
 
@@ -243,6 +243,13 @@ public class Player {
                 ((TileBreakable) tile).damage(l, strength);
                 break; // nur 1 Tile pro Schlag
             }
+        }
+        for(Creeper c : new ArrayList<>(l.creepers)) {
+            if(c.bb.intersect(attackBox)) {
+                boolean fromLeft = pos.x < c.pos.x;
+                int appliedDamage = (currentState == PlayerState.SWORD_ATTACK) ? 2 : 1;
+                c.hurt(this, appliedDamage, fromLeft);
+            }       
         }
     }
 
@@ -263,6 +270,27 @@ public class Player {
     public void changeSoundEnabled(){
         this.soundEnabled = !this.soundEnabled;
     }
+
+    public BoundingBox getAttackBox() {
+        if (currentState == PlayerState.PUNCH) return createAttackBox(0.6f, 0.8f);
+        if (currentState == PlayerState.SWORD_ATTACK) return createAttackBox(0.9f, 0.9f); // bigger box
+        return null;
+    }
+
+    public int getAttackDamage() {
+        if (currentState == PlayerState.PUNCH) return 1;
+        if (currentState == PlayerState.SWORD_ATTACK) return 2;
+        return 0;
+    }
+
+    private BoundingBox createAttackBox(float widthScale, float heightScale) {
+        float attackWidth = w * widthScale;
+        float attackHeight = h * heightScale;
+        float ax = facingLeft ? pos.x - attackWidth : pos.x + w;
+        float ay = pos.y + h * 0.1f;
+        return new BoundingBox(ax, ay, ax + attackWidth, ay + attackHeight);
+    }
+
 
 
 }
