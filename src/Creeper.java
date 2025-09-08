@@ -224,6 +224,7 @@ public class Creeper {
 
         // --- Destroy breakable tiles safely ---
         ArrayList<TileBreakable> tilesToDestroy = new ArrayList<>();
+        l.player.playSound(Platformer.BasePath + "Sound/creeper.wav");
         for(Tile t : l.tiles) {
             if(t instanceof TileBreakable) {
                 TileBreakable tb = (TileBreakable) t;
@@ -245,6 +246,7 @@ public class Creeper {
         l.creepers.remove(this);
         if(distanceToPlayer < explodeRange) {
             l.player.numberOfLifes = Math.max(0, l.player.numberOfLifes - 1);
+            l.player.playSound(Platformer.BasePath + "pain1.wav");
             if(px < cx) l.player.pos.x -= 20;
             else l.player.pos.x += 20;
             l.player.updateBoundingBox();
