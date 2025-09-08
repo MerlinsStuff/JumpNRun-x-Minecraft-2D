@@ -5,6 +5,8 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Random;
+
 import javax.imageio.ImageIO;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
@@ -13,7 +15,7 @@ public class Player {
     enum PlayerState { IDLE, WALK, JUMP, FALL, PUNCH, SWORD_ATTACK }
     PlayerState currentState = PlayerState.IDLE;
 
-    boolean jump = false, walkingLeft = false, walkingRight = false;
+    boolean jump = false, walkingLeft = false, walkingRight = false, fallable = true;;
     boolean collidesTop = false, collidesDown = false, collidesLeft = false, collidesRight = false, collides = false;
 
 
@@ -46,6 +48,8 @@ public class Player {
     float jumpPower = 25.f;
 
     private boolean soundEnabled = true;
+
+    Clip clip;
 
     // Animation-Listen
     private ArrayList<BufferedImage> idleTiles = new ArrayList<>();
@@ -127,6 +131,8 @@ public class Player {
     public void kill() {
         if (numberOfLifes > 0) {
             numberOfLifes--;
+            clip.stop();
+            playSound(Platformer.BasePath + "Sound/drowning.wav");
             pos.x = lastValidPosition.x;
             pos.y = lastValidPosition.y;
             posLastFrame.x = pos.x;
@@ -135,8 +141,15 @@ public class Player {
     }
 
     public void update() {
+    
         Vec2 vel = pos.sub(posLastFrame);
 
+        if (vel.y > 1.0f && !collidesDown){
+            if(fallable){
+                playSound(Platformer.BasePath + "Sound/fall.wav");
+                fallable = false;
+            }
+        }
         if (walkingLeft) {
             vel.x -= movementSpeed / 5f;
             facingDirection = FacingDirection.LEFT;
@@ -153,7 +166,14 @@ public class Player {
             collidesDown = false;
         }
 
-        if (collidesDown) vel = vel.mul(0.92f);
+        if (collidesDown) {
+            if(!fallable){
+                clip.stop();
+                playSound(Platformer.BasePath + "Sound/grasshit.wav");
+            }
+            vel = vel.mul(0.92f);
+            fallable = true;
+        }
         else { vel.x *= 0.85f; vel.y *= 0.92f; }
 
         posLastFrame = new Vec2(pos.x, pos.y);
@@ -393,7 +413,7 @@ public class Player {
 
         try {
             File soundFile = new File(path);
-            Clip clip = AudioSystem.getClip();
+            clip = AudioSystem.getClip();
             clip.open(AudioSystem.getAudioInputStream(soundFile));
             clip.start();
         } catch (Exception e) {
@@ -414,6 +434,7 @@ public class Player {
 
     public int getAttackDamage() {
         if (currentState == PlayerState.PUNCH) return 1;
+
         if (currentState == PlayerState.SWORD_ATTACK) return 2;
         return 0;
     }
