@@ -32,6 +32,14 @@ public class Platformer extends JFrame {
 	BufferStrategy bufferStrategy;
 
 	Timer gameStateUpdateTrigger;
+	public enum GameState {
+		PLAYING,
+		PAUSED,
+		DEAD,
+		WON
+	}
+
+	private GameState currentState = GameState.PLAYING;
 
 	public Platformer() {
 		//exit program when window is closed
@@ -109,10 +117,13 @@ public class Platformer extends JFrame {
 		}
 
 	private void updateGameStateAndRepaint() {
-		l.update();
-		p.update();
-		for(Creeper c : new ArrayList<>(l.creepers)) c.update(p);
-		checkCollision();
+		if(p.pos.x > 13510) currentState = GameState.WON;
+		if (currentState == GameState.PLAYING) {
+			l.update();
+			p.update();
+			for(Creeper c : new ArrayList<>(l.creepers)) c.update(p);
+			checkCollision();
+		}
 		repaint();
 	}
 
@@ -160,7 +171,10 @@ public class Platformer extends JFrame {
 				tile.onCollision(p);
 				p.updateBoundingBox();
 				if (p.numberOfLifes == 0) {
-					try { gameOver(); } catch (IOException e) { e.printStackTrace(); }
+					try { 
+						currentState = GameState.DEAD;
+						gameOver(); 
+					} catch (IOException e) { e.printStackTrace(); }
 				}
 			}
 		}
@@ -251,7 +265,33 @@ public class Platformer extends JFrame {
 			g2d.drawString(String.valueOf(p.brokenTileCount), 70, 70);
 	}
 		g2d.drawImage(getPlayer().getPlayerImage(), (int) (getPlayer().pos.x-l.offsetX), (int) getPlayer().pos.y, this);
+		if (currentState == GameState.PAUSED) {
+			g2d.setColor(new Color(0, 0, 0, 150)); 
+			g2d.fillRect(0, 0, getWidth(), getHeight());
+			g2d.setColor(Color.WHITE);
+			g2d.setFont(new Font("Arial", Font.BOLD, 60));
+			g2d.drawString("PAUSED", getWidth()/2 - 120, getHeight()/2);
+		}
+		if (currentState == GameState.DEAD) {
+			g2d.setColor(new Color(0, 0, 0, 150));
+			g2d.fillRect(0, 0, getWidth(), getHeight());
+			g2d.setColor(Color.RED);
+			g2d.setFont(new Font("Arial", Font.BOLD, 60));
+			g2d.drawString("YOU DIED", getWidth()/2 - 150, getHeight()/2);
+			g2d.setFont(new Font("Arial", Font.PLAIN, 30));
+			g2d.drawString("Press R to Restart", getWidth()/2 - 130, getHeight()/2 + 50);
+		}
 
+		if (currentState == GameState.WON) {
+			g2d.setColor(new Color(0, 0, 0, 150));
+			g2d.fillRect(0, 0, getWidth(), getHeight());
+			g2d.setColor(Color.WHITE);
+			g2d.setFont(new Font("Arial", Font.BOLD, 60));
+			g2d.drawString("YOU WIN!", getWidth()/2 - 150, getHeight()/2);
+			g2d.setFont(new Font("Arial", Font.PLAIN, 30));
+			g2d.drawString("You collected :" + p.points + " Coins!" , getWidth()/2 - 170, getHeight()/2 + 50);
+			g2d.drawString("Press ENTER to Continue", getWidth()/2 - 190, getHeight()/2 + 90);
+		}
 		
 		g2d.drawString(new String(p.points + ""), 500, 50);
 	}
@@ -286,7 +326,9 @@ public class Platformer extends JFrame {
 			Player player = p.getPlayer();
 
 			switch (keyCode) {
-				case KeyEvent.VK_ESCAPE -> p.dispose();
+				case KeyEvent.VK_ESCAPE -> {
+					currentState = (currentState == GameState.PLAYING) ? GameState.PAUSED : GameState.PLAYING;
+				}
 
 				case KeyEvent.VK_LEFT -> player.walkingLeft = true;
 				case KeyEvent.VK_RIGHT -> player.walkingRight = true;
@@ -300,8 +342,16 @@ public class Platformer extends JFrame {
 
 
 				case KeyEvent.VK_R -> {
-					try { p.restart(); } 
-					catch (IOException e) { e.printStackTrace(); }
+					if (currentState == GameState.DEAD) {
+						try { restart(); currentState = GameState.PLAYING; } 
+						catch (IOException e) { e.printStackTrace(); }
+					}
+				}
+				case KeyEvent.VK_ENTER -> {
+					if (currentState == GameState.WON) {
+						try { restart(); currentState = GameState.PLAYING; } 
+						catch (IOException e) { e.printStackTrace(); }
+					}
 				}
 
 				case KeyEvent.VK_F -> player.startPunch();
