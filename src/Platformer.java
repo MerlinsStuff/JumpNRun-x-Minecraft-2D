@@ -253,6 +253,10 @@ public class Platformer extends JFrame {
 
 				case KeyEvent.VK_SPACE -> player.jump = true;
 
+				case KeyEvent.VK_W -> player.facingDirection = Player.FacingDirection.UP;
+        		case KeyEvent.VK_S -> player.facingDirection = Player.FacingDirection.DOWN;
+
+
 				case KeyEvent.VK_R -> {
 					try { p.restart(); } 
 					catch (IOException e) { e.printStackTrace(); }
@@ -274,6 +278,13 @@ public class Platformer extends JFrame {
 				case KeyEvent.VK_RIGHT -> player.walkingRight = false;
 
 				case KeyEvent.VK_SPACE -> player.jump = false;
+
+				case KeyEvent.VK_W, KeyEvent.VK_S -> {
+					// When W/S is released, reset facing direction back to horizontal
+					if (player.walkingLeft) player.facingDirection = Player.FacingDirection.LEFT;
+					else if (player.walkingRight) player.facingDirection = Player.FacingDirection.RIGHT;
+					else player.facingDirection = Player.FacingDirection.RIGHT; // default
+				}
 
 				case KeyEvent.VK_F, KeyEvent.VK_E -> {
 					// Attacke losgelassen → zurück zu WALK oder IDLE

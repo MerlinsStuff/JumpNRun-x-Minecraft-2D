@@ -16,7 +16,10 @@ public class Player {
     boolean jump = false, walkingLeft = false, walkingRight = false;
     boolean collidesTop = false, collidesDown = false, collidesLeft = false, collidesRight = false, collides = false;
 
-    boolean facingLeft = false;
+    enum FacingDirection {
+        UP, DOWN, LEFT, RIGHT
+    }
+    FacingDirection facingDirection = FacingDirection.RIGHT;
 
     Vec2 pos;
     Vec2 posLastFrame;
@@ -50,6 +53,8 @@ public class Player {
     private ArrayList<BufferedImage> swordAttackTiles = new ArrayList<>();
 
     Level l;
+
+    
 
     Player(Level l) {
         this.pos = new Vec2(0, 0);
@@ -131,10 +136,10 @@ public class Player {
 
         if (walkingLeft) {
             vel.x -= movementSpeed / 5f;
-            facingLeft = true;
+            facingDirection = FacingDirection.LEFT;
         } else if (walkingRight) {
             vel.x += movementSpeed / 5f;
-            facingLeft = false;
+            facingDirection = FacingDirection.RIGHT;
         } else if (collidesDown) {
             vel.x *= 0.5f;
             if (Math.abs(vel.x) < 0.1f) vel.x = 0;
@@ -181,15 +186,40 @@ public class Player {
 
     public BufferedImage getPlayerImage() {
         BufferedImage frame = getNextFrame();
-        if (facingLeft) {
-            BufferedImage flipped = new BufferedImage(frame.getWidth(), frame.getHeight(), frame.getType());
+        int w = frame.getWidth();
+        int h = frame.getHeight();
+
+        if (facingDirection == FacingDirection.LEFT) {
+            BufferedImage flipped = new BufferedImage(w, h, frame.getType());
             Graphics2D g = flipped.createGraphics();
-            g.drawImage(frame, frame.getWidth(), 0, -frame.getWidth(), frame.getHeight(), null);
+            g.drawImage(frame, w, 0, -w, h, null);
             g.dispose();
             return flipped;
         }
+
+        if (facingDirection == FacingDirection.UP) {
+            BufferedImage rotated = new BufferedImage(h, w, frame.getType());
+            Graphics2D g = rotated.createGraphics();
+            g.translate(0, w); 
+            g.rotate(Math.toRadians(-90));
+            g.drawImage(frame, 0, 0, null);
+            g.dispose();
+            return rotated;
+        }
+
+        if (facingDirection == FacingDirection.DOWN) {
+            BufferedImage rotated = new BufferedImage(h, w, frame.getType());
+            Graphics2D g = rotated.createGraphics();
+            g.translate(h, 0); 
+            g.rotate(Math.toRadians(90));
+            g.drawImage(frame, 0, 0, null);
+            g.dispose();
+            return rotated;
+        }
+
         return frame;
     }
+
 
     private BufferedImage getNextFrame() {
         ArrayList<BufferedImage> anim = getCurrentAnimationFrames();
@@ -229,29 +259,72 @@ public class Player {
         attack(2);
     }
 
-    private void attack(int strength) {
-        float attackWidth = Tile.tileSize * 0.6f;
-        float attackHeight = h * 0.8f;
+    private static class AttackTarget {
+        BoundingBox bb;
+        TileBreakable tile;
+        Creeper creeper;
 
-        float ax = facingLeft ? pos.x - attackWidth : pos.x + w;
-        float ay = pos.y + h * 0.1f;
-
-        BoundingBox attackBox = new BoundingBox(ax, ay, ax + attackWidth, ay + attackHeight);
-
-        for (Tile tile : new ArrayList<>(l.tiles)) { // Kopie, da Tiles gelöscht werden könnten
-            if (tile instanceof TileBreakable && tile.bb.intersect(attackBox)) {
-                ((TileBreakable) tile).damage(l, strength);
-                break; // nur 1 Tile pro Schlag
-            }
+        AttackTarget(TileBreakable tile) {
+            this.tile = tile;
+            this.bb = tile.bb;
         }
-        for(Creeper c : new ArrayList<>(l.creepers)) {
-            if(c.bb.intersect(attackBox)) {
-                boolean fromLeft = pos.x < c.pos.x;
-                int appliedDamage = (currentState == PlayerState.SWORD_ATTACK) ? 2 : 1;
-                c.hurt(this, appliedDamage, fromLeft);
-            }       
+        AttackTarget(Creeper creeper) {
+            this.creeper = creeper;
+            this.bb = creeper.bb;
         }
     }
+
+
+    private void attack(int strength) {
+        BoundingBox attackBox = getAttackBox(); 
+        if (attackBox == null) return;
+
+        // Collect all possible targets (tiles + creepers)
+        ArrayList<AttackTarget> targets = new ArrayList<>();
+
+        for (Tile tile : new ArrayList<>(l.tiles)) {
+            if (tile instanceof TileBreakable tb && tb.bb.intersect(attackBox)) {
+                targets.add(new AttackTarget(tb));
+            }
+        }
+        for (Creeper c : new ArrayList<>(l.creepers)) {
+            if (c.bb.intersect(attackBox)) {
+                targets.add(new AttackTarget(c));
+            }
+        }
+
+        // Find closest target
+        AttackTarget closest = null;
+        float closestDist = Float.MAX_VALUE;
+
+        for (AttackTarget t : targets) {
+            float dist = Float.MAX_VALUE;
+            switch (facingDirection) {
+                case UP -> dist = boundingBox.min.y - t.bb.max.y;   // player top to target bottom
+                case DOWN -> dist = t.bb.min.y - boundingBox.max.y; // player bottom to target top
+                case LEFT -> dist = boundingBox.min.x - t.bb.max.x; // player left to target right
+                case RIGHT -> dist = t.bb.min.x - boundingBox.max.x; // player right to target left
+            }
+
+            if (dist >= 0 && dist < closestDist) {
+                closestDist = dist;
+                closest = t;
+            }
+        }
+
+        // Apply damage to the closest one
+        if (closest != null) {
+            if (closest.tile != null) {
+                closest.tile.damage(l, strength);
+            } else if (closest.creeper != null) {
+                boolean fromLeft = pos.x < closest.creeper.pos.x;
+                int appliedDamage = (currentState == PlayerState.SWORD_ATTACK) ? 2 : 1;
+                closest.creeper.hurt(this, appliedDamage, fromLeft);
+            }
+        }
+    }
+
+
 
     public void playSound(String path) {
         if (!soundEnabled) return;
@@ -286,10 +359,32 @@ public class Player {
     private BoundingBox createAttackBox(float widthScale, float heightScale) {
         float attackWidth = w * widthScale;
         float attackHeight = h * heightScale;
-        float ax = facingLeft ? pos.x - attackWidth : pos.x + w;
-        float ay = pos.y + h * 0.1f;
-        return new BoundingBox(ax, ay, ax + attackWidth, ay + attackHeight);
-    }
+        float ax, ay;
+
+            switch (facingDirection) {
+                case LEFT -> {
+                    ax = pos.x - attackWidth;
+                    ay = pos.y + h * 0.1f;
+                    return new BoundingBox(ax, ay, ax + attackWidth, ay + attackHeight);
+                }
+                case RIGHT -> {
+                    ax = pos.x + w;
+                    ay = pos.y + h * 0.1f;
+                    return new BoundingBox(ax, ay, ax + attackWidth, ay + attackHeight);
+                }
+                case UP -> {
+                    ax = pos.x + w * 0.1f;
+                    ay = pos.y - attackHeight;
+                    return new BoundingBox(ax, ay, ax + attackWidth, ay + attackHeight);
+                }
+                case DOWN -> {
+                    ax = pos.x + w * 0.2f;
+                    ay = pos.y + h;
+                    return new BoundingBox(ax, ay, ax + attackWidth, ay + attackHeight);
+                }
+                default -> { return null; }
+            }
+        }
 
 
 
