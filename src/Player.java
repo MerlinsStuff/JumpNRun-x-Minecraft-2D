@@ -146,7 +146,7 @@ public class Player {
 
         if (vel.y > 1.0f && !collidesDown){
             if(fallable){
-                playSound(Platformer.BasePath + "Sound/fall.wav");
+                playSound(Platformer.BasePath + "Sound/fall2.wav");
                 fallable = false;
             }
         }

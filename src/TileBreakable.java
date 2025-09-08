@@ -76,6 +76,7 @@ public class TileBreakable extends Tile {
         if (destroyed) return;
 
         currentStage += strength;
+        l.player.playSound(Platformer.BasePath + "Sound/gravelhit.wav");
         if (currentStage >= breakStages.size()) {
             destroyed = true;
             l.tiles.remove(this); 
