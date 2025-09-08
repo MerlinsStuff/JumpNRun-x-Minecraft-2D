@@ -1,3 +1,5 @@
+import java.awt.Color;
+import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.event.KeyAdapter;
@@ -12,6 +14,8 @@ import java.io.Serial;
 import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
+
+import javax.imageio.ImageIO;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.filechooser.FileFilter;
@@ -96,6 +100,7 @@ public class Platformer extends JFrame {
 		p.currentState = Player.PlayerState.IDLE;
 		p.displayedAnimationState = 0;
 		p.updateBoundingBox();
+		p.brokenTileCount = 0;
 
 		l.offsetX = 0;
 		l.creepers.clear();
@@ -210,6 +215,19 @@ public class Platformer extends JFrame {
 			l.tiles.get(i).draw(g2d,l.offsetX,0);
 		}
 		for(Creeper c : l.creepers) c.draw(g2d, l.offsetX, 0);
+
+		if (p.brokenTileCount > 0) {
+
+			try {
+				g2d.drawImage(ImageIO.read(new File("./assets/Tiles/grassMid/GrassMidBreaking0.png")), 50, 50, 40, 40, null);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} // small icon in top-left
+			g2d.setColor(Color.WHITE);
+			g2d.setFont(new Font("Arial", Font.BOLD, 20));
+			g2d.drawString(String.valueOf(p.brokenTileCount), 80, 85);
+	}
 		g2d.drawImage(getPlayer().getPlayerImage(), (int) (getPlayer().pos.x-l.offsetX), (int) getPlayer().pos.y, this);
 
 		
@@ -255,6 +273,8 @@ public class Platformer extends JFrame {
 
 				case KeyEvent.VK_W -> player.facingDirection = Player.FacingDirection.UP;
         		case KeyEvent.VK_S -> player.facingDirection = Player.FacingDirection.DOWN;
+
+				case KeyEvent.VK_D -> player.placeTile(l);
 
 
 				case KeyEvent.VK_R -> {

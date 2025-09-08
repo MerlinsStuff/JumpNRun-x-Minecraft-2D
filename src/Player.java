@@ -39,6 +39,7 @@ public class Player {
     int moveCounter = 0;
     int points = 0;
     int numberOfLifes = 3;
+    public int brokenTileCount = 0;
 
     float jumpPower = 25.f;
 
@@ -54,7 +55,7 @@ public class Player {
 
     Level l;
 
-    
+
 
     Player(Level l) {
         this.pos = new Vec2(0, 0);
@@ -324,6 +325,59 @@ public class Player {
         }
     }
 
+    public void placeTile(Level l) {
+        int newX = (int) pos.x;
+        int newY = (int) pos.y;
+
+        switch (facingDirection) {
+            case LEFT -> newX -= Tile.tileSize;
+            case RIGHT -> newX += w;
+            case UP -> newY -= Tile.tileSize;
+            case DOWN -> newY += h;
+        }
+
+        BoundingBox candidateBB = new BoundingBox(newX, newY, newX + Tile.tileSize, newY + Tile.tileSize);
+/* 
+        if (candidateBB.intersect(this.boundingBox)) {
+            Vec2 shift = candidateBB.OverlapSize(this.boundingBox);
+            pos.x += shift.x;
+            pos.y += shift.y;
+            updateBoundingBox();
+        }
+
+        for (Tile t : l.tiles) {
+            if (t.bb.intersect(candidateBB)) {
+                Vec2 shift = t.bb.OverlapSize(candidateBB);
+                newX += shift.x;
+                newY += shift.y;
+                candidateBB = new BoundingBox(newX, newY, newX + Tile.tileSize, newY + Tile.tileSize);
+            }
+        }
+
+        if (facingDirection != FacingDirection.UP) {
+            BoundingBox below = new BoundingBox(newX, newY + Tile.tileSize, newX + Tile.tileSize, newY + Tile.tileSize + 1);
+            boolean supported = false;
+            for (Tile t : l.tiles) {
+                if (t.bb.intersect(below)) {
+                    supported = true;
+                    break;
+                }
+            }
+            if (!supported) {
+                System.out.println("Cannot place: tile would float");
+                return;
+            }
+        }
+        
+
+*/
+        brokenTileCount--;
+        TileBreakable newTile = new TileBreakable("./assets/Tiles/grassMid/", "GrassMid", newX- w, newY + h);
+        l.tiles.add(newTile);
+        System.out.println("Tile placed successfully at " + newX + ", " + newY);
+    }
+
+
 
 
     public void playSound(String path) {
@@ -386,6 +440,7 @@ public class Player {
             }
         }
 
+   
 
 
 }

@@ -10,9 +10,13 @@ public class TileBreakable extends Tile {
     ArrayList<BufferedImage> breakStages = new ArrayList<>();
     int currentStage = 0;
     boolean destroyed = false;
+    String basePath;
+    String tileName;
 
     public TileBreakable(String basePath, String tileName, float x, float y) {
         super(0, x, y); // imageIndex nicht relevant
+        this.basePath = basePath; 
+        this.tileName = tileName;
         hasRigidCollision = true;
 
         try {
@@ -26,6 +30,14 @@ public class TileBreakable extends Tile {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        }
+
+        if (breakStages.isEmpty()) {
+            try {
+                breakStages.add(ImageIO.read(new File(basePath + tileName + ".png")));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -66,7 +78,8 @@ public class TileBreakable extends Tile {
         currentStage += strength;
         if (currentStage >= breakStages.size()) {
             destroyed = true;
-            l.tiles.remove(this); // Block verschwindet komplett
+            l.tiles.remove(this); 
+            l.player.brokenTileCount++;
         }
     }
 
@@ -78,6 +91,14 @@ public class TileBreakable extends Tile {
     @Override
     public void draw(Graphics2D g2d, float offsetX, float offsetY) {
         if (!destroyed) {
+            if(breakStages.isEmpty()){
+                try {
+                    breakStages.add(ImageIO.read(new File(basePath + tileName + ".png")));
+                } catch (IOException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
             g2d.drawImage(
                 breakStages.get(currentStage),
                 (int) (bb.min.x - offsetX),
