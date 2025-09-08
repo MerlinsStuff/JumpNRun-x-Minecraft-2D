@@ -214,19 +214,41 @@ public class Platformer extends JFrame {
 		for (int i = 0; i< l.tiles.size(); i++) {
 			l.tiles.get(i).draw(g2d,l.offsetX,0);
 		}
+		int num = p.totaLifes;
+		for(int j = 0; j < p.totaLifes - p.numberOfLifes; j++){
+			try {
+				g2d.drawImage(ImageIO.read(new File("./assets/Items/MincraftEmptyHeart.png")), 900 - num * 60, 50, 50, 50, null);
+				num--;
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+
+		for (int i = p.totaLifes - p.numberOfLifes ; i < p.totaLifes; i++) {
+			try {
+				g2d.drawImage(ImageIO.read(new File("./assets/Items/MinecraftFullHeart.png")), 900  - num * 60, 50, 50, 50, null);
+				num--;
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+
+
 		for(Creeper c : l.creepers) c.draw(g2d, l.offsetX, 0);
 
 		if (p.brokenTileCount > 0) {
 
 			try {
-				g2d.drawImage(ImageIO.read(new File("./assets/Tiles/grassMid/GrassMidBreaking0.png")), 50, 50, 40, 40, null);
+				g2d.drawImage(ImageIO.read(new File("./assets/Tiles/grassCenter/GrassCenterBreaking1.png")), 50, 50, 60, 60, null);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			} // small icon in top-left
 			g2d.setColor(Color.WHITE);
 			g2d.setFont(new Font("Arial", Font.BOLD, 20));
-			g2d.drawString(String.valueOf(p.brokenTileCount), 80, 85);
+			g2d.drawString(String.valueOf(p.brokenTileCount), 70, 70);
 	}
 		g2d.drawImage(getPlayer().getPlayerImage(), (int) (getPlayer().pos.x-l.offsetX), (int) getPlayer().pos.y, this);
 

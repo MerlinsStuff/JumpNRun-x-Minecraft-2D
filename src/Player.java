@@ -16,6 +16,7 @@ public class Player {
     boolean jump = false, walkingLeft = false, walkingRight = false;
     boolean collidesTop = false, collidesDown = false, collidesLeft = false, collidesRight = false, collides = false;
 
+
     enum FacingDirection {
         UP, DOWN, LEFT, RIGHT
     }
@@ -38,7 +39,8 @@ public class Player {
     int displayedAnimationState = 0;
     int moveCounter = 0;
     int points = 0;
-    int numberOfLifes = 3;
+    int totaLifes = 3;
+    int numberOfLifes = totaLifes;
     public int brokenTileCount = 0;
 
     float jumpPower = 25.f;
@@ -83,10 +85,10 @@ public class Player {
 
         this.w = idleTiles.get(0).getWidth();
         this.h = idleTiles.get(0).getHeight();
-        this.padX = w * 0.12f;
-        this.padTop = h * 0.05f;
+        this.padX = w * 0.25f;
+        this.padTop = h * 0.25f;
 
-        boundingBox = new BoundingBox(padX, 0, w - padX, h);
+        boundingBox = new BoundingBox(padX, 0 + padTop, w - padX, h);
         updateBoundingBox();
         posLastFrame.x = pos.x;
         posLastFrame.y = pos.y;
@@ -182,7 +184,7 @@ public class Player {
         boundingBox.min.x = pos.x + padX;
         boundingBox.min.y = pos.y + padTop;
         boundingBox.max.x = pos.x + w - padX;
-        boundingBox.max.y = pos.y + h - padTop;
+        boundingBox.max.y = pos.y + h;
     }
 
     public BufferedImage getPlayerImage() {
@@ -326,16 +328,22 @@ public class Player {
     }
 
     public void placeTile(Level l) {
-        int newX = (int) pos.x;
-        int newY = (int) pos.y;
+        if(brokenTileCount == 0){
+            return;
+        }
+        float size = Tile.tileSize;
+        System.out.println("Player at: " + pos.x + " " + pos.y);
+        float newX = pos.x - (pos.x % size) + size*3;
+        float newY = pos.y - (pos.y % size) - 5;
 
         switch (facingDirection) {
-            case LEFT -> newX -= Tile.tileSize;
-            case RIGHT -> newX += w;
-            case UP -> newY -= Tile.tileSize;
-            case DOWN -> newY += h;
+            case LEFT -> newX -= size;
+            case RIGHT -> newX += size;
+            case UP -> newY -= size*2;
+            case DOWN -> newY += size;
         }
 
+        System.out.println("Tile at: " + newX + " " + newY);
         BoundingBox candidateBB = new BoundingBox(newX, newY, newX + Tile.tileSize, newY + Tile.tileSize);
 /* 
         if (candidateBB.intersect(this.boundingBox)) {
