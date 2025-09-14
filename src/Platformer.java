@@ -1,3 +1,5 @@
+import java.awt.Color;
+import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.event.KeyAdapter;
@@ -9,11 +11,11 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serial;
+import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.Clip;
+import javax.imageio.ImageIO;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.filechooser.FileFilter;
@@ -30,6 +32,14 @@ public class Platformer extends JFrame {
 	BufferStrategy bufferStrategy;
 
 	Timer gameStateUpdateTrigger;
+	public enum GameState {
+		PLAYING,
+		PAUSED,
+		DEAD,
+		WON
+	}
+
+	private GameState currentState = GameState.PLAYING;
 
 	public Platformer() {
 		//exit program when window is closed
@@ -47,9 +57,13 @@ public class Platformer extends JFrame {
 		int result = fc.showOpenDialog(this);
 		File selectedFile = new File("");
 		addKeyListener(new AL(this));
+		this.setVisible(true);
 		createBufferStrategy(2);
 		bufferStrategy = this.getBufferStrategy();
 
+		if (result == JFileChooser.APPROVE_OPTION) {
+			selectedFile = fc.getSelectedFile();
+		} else { dispose(); System.exit(0); }
 
 		if (result == JFileChooser.APPROVE_OPTION) {
 			selectedFile = fc.getSelectedFile();
@@ -65,7 +79,7 @@ public class Platformer extends JFrame {
 			l.player = p;
 
 			this.setBounds(0, 0, 1000, 12 * 70);
-			this.setVisible(true);
+			
 			gameStateUpdateTrigger = new Timer();
 			gameStateUpdateTrigger.scheduleAtFixedRate(new TimerTask() {
 
@@ -75,7 +89,7 @@ public class Platformer extends JFrame {
 				}
 
 			}, 0, 10);
-			playSound(BasePath + "Sound/soundtrack.wav");
+			//playSound(BasePath + "Sound/soundtrack.wav");
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -85,58 +99,70 @@ public class Platformer extends JFrame {
 	private void restart() throws IOException {
 		p.pos.x = 0;
 		p.pos.y = 0;
-		l.offsetX = 0;
+		p.posLastFrame.x = 0;
+		p.posLastFrame.y = 0;
+		p.lastValidPosition.x = 0;
+		p.lastValidPosition.y = 0;
 		p.numberOfLifes = 3;
-		l.initLevel();
 		p.points = 0;
-	}
+		p.currentState = Player.PlayerState.IDLE;
+		p.displayedAnimationState = 0;
+		p.updateBoundingBox();
+		p.brokenTileCount = 0;
+
+		l.offsetX = 0;
+		l.creepers.clear();
+		l.initLevel();
+			
+		}
 
 	private void updateGameStateAndRepaint() {
-		l.update();
-		p.update();
-		checkCollision();
-
+		if(p.pos.x > 13510) currentState = GameState.WON;
+		if (currentState == GameState.PLAYING) {
+			l.update();
+			p.update();
+			for(Creeper c : new ArrayList<>(l.creepers)) c.update(p);
+			checkCollision();
+		}
 		repaint();
 	}
 
 	private void checkCollision() {
-		float playerPosX = p.pos.x;
-
+		// Reset player collision flags
 		p.collidesDown = false;
 		p.collidesLeft = false;
 		p.collidesRight = false;
 		p.collidesTop = false;
 		p.collides = false;
 
-		// Collision
-		for (int i = 0; i < l.tiles.size(); i++) {
-
-			Tile tile = l.tiles.get(i);
-
+		// ===== Tile Collisions =====
+		for (Tile tile : new ArrayList<>(l.tiles)) {
 			Vec2 overlapSize = tile.bb.OverlapSize(p.boundingBox);
-
-			float epsilon = 8.f; // experiment with this value. If too low,the player might get stuck when walking over the
-			                     // ground. If too high, it can cause glitching inside/through walls
-
-
-			if (overlapSize.x >= 0 && overlapSize.y >= 0 && Math.abs(overlapSize.x + overlapSize.y) >= epsilon) {
-
-				if(tile.hasRigidCollision) {
-					if (Math.abs(overlapSize.x) > Math.abs(overlapSize.y)) {// Y overlap correction
-
-						if (p.boundingBox.min.y + p.boundingBox.max.y > tile.bb.min.y + tile.bb.max.y) { // player comes from below
+			if (overlapSize.x > 0 && overlapSize.y > 0) {
+				if (tile.hasRigidCollision) {
+					boolean resolveY = overlapSize.y < overlapSize.x; // resolve smallest penetration first
+					if (resolveY) {
+						float centerP = (p.boundingBox.min.y + p.boundingBox.max.y) * 0.5f;
+						float centerT = (tile.bb.min.y + tile.bb.max.y) * 0.5f;
+						if (centerP > centerT) { // from below
 							p.pos.y += overlapSize.y;
+							p.posLastFrame.y = p.pos.y;
 							p.collidesTop = true;
-						} else { // player comes from above
+						} else { // from above
 							p.pos.y -= overlapSize.y;
+							p.posLastFrame.y = p.pos.y;
 							p.collidesDown = true;
 						}
-					} else { // X overlap correction
-						if (p.boundingBox.min.x + p.boundingBox.max.x > tile.bb.min.x + tile.bb.max.x) { // player comes from right
+					} else {
+						float centerP = (p.boundingBox.min.x + p.boundingBox.max.x) * 0.5f;
+						float centerT = (tile.bb.min.x + tile.bb.max.x) * 0.5f;
+						if (centerP > centerT) { // from right
 							p.pos.x += overlapSize.x;
+							p.posLastFrame.x = p.pos.x;
 							p.collidesLeft = true;
-						} else { // player comes from left
+						} else { // from left
 							p.pos.x -= overlapSize.x;
+							p.posLastFrame.x = p.pos.x;
 							p.collidesRight = true;
 						}
 					}
@@ -144,19 +170,36 @@ public class Platformer extends JFrame {
 				p.collides = true;
 				tile.onCollision(p);
 				p.updateBoundingBox();
-				if (p.numberOfLifes == 0)
-					try {
-						gameOver();
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
+				if (p.numberOfLifes == 0) {
+					try { 
+						currentState = GameState.DEAD;
+						gameOver(); 
+					} catch (IOException e) { e.printStackTrace(); }
+				}
+			}
+		}
+
+		// ===== Creeper Collisions =====
+		for (Creeper c : new ArrayList<>(l.creepers)) {
+			Vec2 overlap = c.bb.OverlapSize(p.boundingBox);
+			if (overlap.x > 0 && overlap.y > 0) {
+				// Player attacking creeper
+				BoundingBox attackBox = p.getAttackBox(); // let player define attack box
+				int damage = p.getAttackDamage();
+
+				if (attackBox != null && c.bb.intersect(attackBox)) {
+					boolean fromLeft = p.pos.x < c.pos.x;
+					c.hurt(p, damage, fromLeft);
+				}
 			}
 		}
 	}
 
+
 	private void gameOver() throws IOException {
 		restart();
 	}
+
 
 	@Override
 	public void paint(Graphics g) {
@@ -173,21 +216,83 @@ public class Platformer extends JFrame {
 	}
 
 	private void draw(Graphics2D g2d) {
+		if (l == null || l.getResultingImage() == null) return;
 		BufferedImage level = (BufferedImage) l.getResultingImage();
 		if (l.offsetX > level.getWidth() - 1000)
 			l.offsetX = level.getWidth() - 1000;
-		BufferedImage bi = level.getSubimage((int) l.offsetX, 0, 1000, level.getHeight());
+			int width = Math.min(1000, level.getWidth() - (int)l.offsetX);
+			BufferedImage bi = level.getSubimage((int) l.offsetX, 0, width, level.getHeight());
 		g2d.drawImage(l.backgroundImage, 0, 0, this);
 		g2d.drawImage(bi, 0, 0, this);
 
 		for (int i = 0; i< l.tiles.size(); i++) {
 			l.tiles.get(i).draw(g2d,l.offsetX,0);
 		}
-		g2d.drawImage(getPlayer().getPlayerImage(), (int) (getPlayer().pos.x-l.offsetX), (int) getPlayer().pos.y, this);
-
-		if (getPlayer().numberOfLifes > 0) {
-			g2d.drawImage(getPlayer().tilesLife.get(3 - getPlayer().numberOfLifes), 1000 - 70, 50, this);
+		int num = p.totaLifes;
+		for(int j = 0; j < p.totaLifes - p.numberOfLifes; j++){
+			try {
+				g2d.drawImage(ImageIO.read(new File("./assets/Items/MincraftEmptyHeart.png")), 900 - num * 60, 50, 50, 50, null);
+				num--;
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
+
+		for (int i = p.totaLifes - p.numberOfLifes ; i < p.totaLifes; i++) {
+			try {
+				g2d.drawImage(ImageIO.read(new File("./assets/Items/MinecraftFullHeart.png")), 900  - num * 60, 50, 50, 50, null);
+				num--;
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+
+
+		for(Creeper c : l.creepers) c.draw(g2d, l.offsetX, 0);
+
+		if (p.brokenTileCount > 0) {
+
+			try {
+				g2d.drawImage(ImageIO.read(new File("./assets/Tiles/grassCenter/GrassCenterBreaking1.png")), 50, 50, 60, 60, null);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} // small icon in top-left
+			g2d.setColor(Color.WHITE);
+			g2d.setFont(new Font("Arial", Font.BOLD, 20));
+			g2d.drawString(String.valueOf(p.brokenTileCount), 70, 70);
+	}
+		g2d.drawImage(getPlayer().getPlayerImage(), (int) (getPlayer().pos.x-l.offsetX), (int) getPlayer().pos.y, this);
+		if (currentState == GameState.PAUSED) {
+			g2d.setColor(new Color(0, 0, 0, 150)); 
+			g2d.fillRect(0, 0, getWidth(), getHeight());
+			g2d.setColor(Color.WHITE);
+			g2d.setFont(new Font("Arial", Font.BOLD, 60));
+			g2d.drawString("PAUSED", getWidth()/2 - 120, getHeight()/2);
+		}
+		if (currentState == GameState.DEAD) {
+			g2d.setColor(new Color(0, 0, 0, 150));
+			g2d.fillRect(0, 0, getWidth(), getHeight());
+			g2d.setColor(Color.RED);
+			g2d.setFont(new Font("Arial", Font.BOLD, 60));
+			g2d.drawString("YOU DIED", getWidth()/2 - 150, getHeight()/2);
+			g2d.setFont(new Font("Arial", Font.PLAIN, 30));
+			g2d.drawString("Press R to Restart", getWidth()/2 - 130, getHeight()/2 + 50);
+		}
+
+		if (currentState == GameState.WON) {
+			g2d.setColor(new Color(0, 0, 0, 150));
+			g2d.fillRect(0, 0, getWidth(), getHeight());
+			g2d.setColor(Color.WHITE);
+			g2d.setFont(new Font("Arial", Font.BOLD, 60));
+			g2d.drawString("YOU WIN!", getWidth()/2 - 150, getHeight()/2);
+			g2d.setFont(new Font("Arial", Font.PLAIN, 30));
+			g2d.drawString("You collected :" + p.points + " Coins!" , getWidth()/2 - 170, getHeight()/2 + 50);
+			g2d.drawString("Press ENTER to Continue", getWidth()/2 - 190, getHeight()/2 + 90);
+		}
+		
 		g2d.drawString(new String(p.points + ""), 500, 50);
 	}
 
@@ -220,35 +325,38 @@ public class Platformer extends JFrame {
 			int keyCode = event.getKeyCode();
 			Player player = p.getPlayer();
 
-			if (keyCode == KeyEvent.VK_ESCAPE) {
-				dispose();
-			}
-
-			if (keyCode == KeyEvent.VK_UP) {
-			}
-
-			if (keyCode == KeyEvent.VK_DOWN) {
-			}
-
-			if (keyCode == KeyEvent.VK_LEFT) {
-				player.walkingLeft = true;
-			}
-
-			if (keyCode == KeyEvent.VK_RIGHT) {
-				player.walkingRight = true;
-			}
-
-			if (keyCode == KeyEvent.VK_SPACE) {
-				player.jump = true;
-			}
-
-			if (keyCode == KeyEvent.VK_R) {
-				try {
-					restart();
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+			switch (keyCode) {
+				case KeyEvent.VK_ESCAPE -> {
+					currentState = (currentState == GameState.PLAYING) ? GameState.PAUSED : GameState.PLAYING;
 				}
+
+				case KeyEvent.VK_LEFT -> player.walkingLeft = true;
+				case KeyEvent.VK_RIGHT -> player.walkingRight = true;
+
+				case KeyEvent.VK_SPACE -> player.jump = true;
+
+				case KeyEvent.VK_W -> player.facingDirection = Player.FacingDirection.UP;
+        		case KeyEvent.VK_S -> player.facingDirection = Player.FacingDirection.DOWN;
+
+				case KeyEvent.VK_D -> player.placeTile(l);
+
+
+				case KeyEvent.VK_R -> {
+					if (currentState == GameState.DEAD) {
+						try { restart(); currentState = GameState.PLAYING; } 
+						catch (IOException e) { e.printStackTrace(); }
+					}
+				}
+				case KeyEvent.VK_ENTER -> {
+					if (currentState == GameState.WON) {
+						try { restart(); currentState = GameState.PLAYING; } 
+						catch (IOException e) { e.printStackTrace(); }
+					}
+				}
+
+				case KeyEvent.VK_F -> player.startPunch();
+				case KeyEvent.VK_E -> player.startSwordAttack();
+				case KeyEvent.VK_P -> player.changeSoundEnabled();
 			}
 		}
 
@@ -257,35 +365,51 @@ public class Platformer extends JFrame {
 			int keyCode = event.getKeyCode();
 			Player player = p.getPlayer();
 
-			if (keyCode == KeyEvent.VK_UP) {
-			}
+			switch (keyCode) {
+				case KeyEvent.VK_LEFT -> player.walkingLeft = false;
+				case KeyEvent.VK_RIGHT -> player.walkingRight = false;
 
-			if (keyCode == KeyEvent.VK_DOWN) {
-			}
+				case KeyEvent.VK_SPACE -> player.jump = false;
 
-			if (keyCode == KeyEvent.VK_LEFT) {
-				player.walkingLeft = false;
-			}
+				case KeyEvent.VK_W, KeyEvent.VK_S -> {
+					// When W/S is released, reset facing direction back to horizontal
+					if (player.walkingLeft) player.facingDirection = Player.FacingDirection.LEFT;
+					else if (player.walkingRight) player.facingDirection = Player.FacingDirection.RIGHT;
+					else player.facingDirection = Player.FacingDirection.RIGHT; // default
+				}
 
-			if (keyCode == KeyEvent.VK_RIGHT) {
-				player.walkingRight = false;
-			}
-
-			if (keyCode == KeyEvent.VK_SPACE) {
-				player.jump = false;
+				case KeyEvent.VK_F, KeyEvent.VK_E -> {
+					// Attacke losgelassen → zurück zu WALK oder IDLE
+					if (player.walkingLeft || player.walkingRight) {
+						player.currentState = Player.PlayerState.WALK;
+					} else {
+						player.currentState = Player.PlayerState.IDLE;
+					}
+					player.displayedAnimationState = 0; // Animation zurücksetzen
+				}
 			}
 		}
 	}
 
-	public void playSound(String path){
-		File lol = new File(path);
 
-		try{
+/* 
+	boolean soundEnabled = false;
+
+	public void playSound(String path) {
+		if (!soundEnabled) return;  // Sound ausgeschaltet
+
+		try {
+			File soundFile = new File(path);
 			Clip clip = AudioSystem.getClip();
-			clip.open(AudioSystem.getAudioInputStream(lol));
+			clip.open(AudioSystem.getAudioInputStream(soundFile));
 			clip.start();
-		} catch (Exception e){
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
+
+	public void setSoundEnabled(boolean enabled) {
+		soundEnabled = enabled;
+	}
+		*/
 }

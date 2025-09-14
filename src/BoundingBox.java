@@ -7,21 +7,9 @@ public class BoundingBox {
     }
 
     public Vec2 OverlapSize(BoundingBox b) {
-        Vec2 result = new Vec2(0, 0);
-
-        // X-dimension
-        if (min.x < b.min.x)
-            result.x = max.x - b.min.x;
-        else
-            result.x = b.max.x - min.x;
-
-        // Y-dimension
-        if (min.y < b.min.y)
-            result.y = max.y - b.min.y;
-        else
-            result.y = b.max.y - min.y;
-
-        return result;
+        float ox = Math.min(max.x, b.max.x) - Math.max(min.x, b.min.x);
+        float oy = Math.min(max.y, b.max.y) - Math.max(min.y, b.min.y);
+        return new Vec2(ox, oy);
     }
 
     public boolean intersect(BoundingBox b) {
