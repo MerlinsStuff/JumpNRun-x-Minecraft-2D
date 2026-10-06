@@ -143,7 +143,6 @@ public class Level {
 				return new TileBreakable("./assets/Tiles/grass/", "Grass", x, y);
 			case 0xFF006400:
 				Creeper c = new Creeper(this, x - Tile.tileSize, y - Tile.tileSize);
-				System.out.println("Creeper spawned at " + c.pos.x + ", " + c.pos.y);
 				creepers.add(c);
 
 				return null;

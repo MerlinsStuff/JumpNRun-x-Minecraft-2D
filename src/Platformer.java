@@ -55,7 +55,7 @@ public class Platformer extends JFrame {
 		FileFilter filter = new FileNameExtensionFilter("Level image (.bmp)","bmp");
 		fc.setFileFilter(filter);
 		int result = fc.showOpenDialog(this);
-		File selectedFile = new File("");
+		File selectedFile;
 		addKeyListener(new AL(this));
 		this.setVisible(true);
 		createBufferStrategy(2);
@@ -63,14 +63,11 @@ public class Platformer extends JFrame {
 
 		if (result == JFileChooser.APPROVE_OPTION) {
 			selectedFile = fc.getSelectedFile();
-		} else { dispose(); System.exit(0); }
-
-		if (result == JFileChooser.APPROVE_OPTION) {
-			selectedFile = fc.getSelectedFile();
 			System.out.println("Selected file: " + selectedFile.getAbsolutePath());
 		} else {
 			dispose();
 			System.exit(0);
+			return;
 		}
 
 		try {
@@ -89,7 +86,6 @@ public class Platformer extends JFrame {
 				}
 
 			}, 0, 10);
-			//playSound(BasePath + "Sound/soundtrack.wav");
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -390,26 +386,4 @@ public class Platformer extends JFrame {
 			}
 		}
 	}
-
-
-/* 
-	boolean soundEnabled = false;
-
-	public void playSound(String path) {
-		if (!soundEnabled) return;  // Sound ausgeschaltet
-
-		try {
-			File soundFile = new File(path);
-			Clip clip = AudioSystem.getClip();
-			clip.open(AudioSystem.getAudioInputStream(soundFile));
-			clip.start();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	public void setSoundEnabled(boolean enabled) {
-		soundEnabled = enabled;
-	}
-		*/
 }

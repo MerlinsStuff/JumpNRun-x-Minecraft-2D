@@ -5,7 +5,6 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Random;
 
 import javax.imageio.ImageIO;
 import javax.sound.sampled.AudioSystem;
@@ -352,7 +351,6 @@ public class Player {
             return;
         }
         float size = Tile.tileSize;
-        System.out.println("Player at: " + pos.x + " " + pos.y);
         float newX = pos.x - (pos.x % size) + size*3;
         float newY = pos.y - (pos.y % size) - 5;
 
@@ -363,46 +361,9 @@ public class Player {
             case DOWN -> newY += size;
         }
 
-        System.out.println("Tile at: " + newX + " " + newY);
-        BoundingBox candidateBB = new BoundingBox(newX, newY, newX + Tile.tileSize, newY + Tile.tileSize);
-/* 
-        if (candidateBB.intersect(this.boundingBox)) {
-            Vec2 shift = candidateBB.OverlapSize(this.boundingBox);
-            pos.x += shift.x;
-            pos.y += shift.y;
-            updateBoundingBox();
-        }
-
-        for (Tile t : l.tiles) {
-            if (t.bb.intersect(candidateBB)) {
-                Vec2 shift = t.bb.OverlapSize(candidateBB);
-                newX += shift.x;
-                newY += shift.y;
-                candidateBB = new BoundingBox(newX, newY, newX + Tile.tileSize, newY + Tile.tileSize);
-            }
-        }
-
-        if (facingDirection != FacingDirection.UP) {
-            BoundingBox below = new BoundingBox(newX, newY + Tile.tileSize, newX + Tile.tileSize, newY + Tile.tileSize + 1);
-            boolean supported = false;
-            for (Tile t : l.tiles) {
-                if (t.bb.intersect(below)) {
-                    supported = true;
-                    break;
-                }
-            }
-            if (!supported) {
-                System.out.println("Cannot place: tile would float");
-                return;
-            }
-        }
-        
-
-*/
         brokenTileCount--;
         TileBreakable newTile = new TileBreakable("./assets/Tiles/grassMid/", "GrassMid", newX- w, newY + h);
         l.tiles.add(newTile);
-        System.out.println("Tile placed successfully at " + newX + ", " + newY);
     }
 
 
